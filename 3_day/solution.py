@@ -1,17 +1,16 @@
 from string import ascii_letters
 import os
-from helpers import time_it
+
 
 filename = "example.txt"
 filename = "input.txt"
-
 directory, _ = os.path.split(__file__)
 filepath = directory + '/' + filename
 
 with open(filepath, "r") as f:
     rucksacks = f.read().splitlines()
 
-@time_it
+
 def find_points(letter):
     return {k: v for k, v in zip(ascii_letters, range(1, len(ascii_letters) + 1))}[letter]
 
