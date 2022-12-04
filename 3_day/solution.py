@@ -5,7 +5,7 @@ import os
 filename = "example.txt"
 filename = "input.txt"
 directory, _ = os.path.split(__file__)
-filepath = directory + '/' + filename
+filepath = directory + "/" + filename
 
 with open(filepath, "r") as f:
     rucksacks = f.read().splitlines()
