@@ -1,5 +1,9 @@
 import os
+from time import time
+from contextlib import contextmanager
 
+
+start = time()
 
 filename = "example.txt"
 filename = "input.txt"
@@ -28,3 +32,5 @@ for pair in pairs:
 
 print("Part 1:", full_overlap)
 print("Part 2:", partial_overlap)
+end = time()
+print('Total time was', end - start, 'seconds')
