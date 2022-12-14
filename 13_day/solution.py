@@ -1,5 +1,6 @@
 import os
 import json
+from functools import cmp_to_key
 
 
 filename = "example.txt"
@@ -11,43 +12,86 @@ with open(filepath, "r") as f:
     rows = f.read().splitlines()
 input = [json.loads(row) for row in rows if row != '']
 
-'''
-When comparing two values, the first value is called left and the second value is called right. Then:
 
-If both values are integers, the lower integer should come first. If the left integer is lower than the right integer, the inputs are in the right order. If the left integer is higher than the right integer, the inputs are not in the right order. Otherwise, the inputs are the same integer; continue checking the next part of the input.
-If both values are lists, compare the first value of each list, then the second value, and so on. If the left list runs out of items first, the inputs are in the right order. If the right list runs out of items first, the inputs are not in the right order. If the lists are the same length and no comparison makes a decision about the order, continue checking the next part of the input.
-If exactly one value is an integer, convert the integer to a list which contains that integer as its only value, then retry the comparison. For example, if comparing [0,0,0] and 2, convert the right value to [2] (a list containing 2); the result is then found by instead comparing [0,0,0] and [2].
-'''
+def compare_ints(left, right):
+    if left < right:
+        return 1
+    elif left == right:
+        return 0
+    else:
+        return -1
 
-def is_correct(left, right):
-    # import pdb; pdb.set_trace()
+
+def compare_lists(left, right):
+    left_qty = len(left)
+    right_qty = len(right)
+
+    # check if we have anything to compare
+    if left_qty == right_qty == 0:
+        return 0
+    elif left_qty == 0:
+        return 1
+
+    # if we compare, check if one is correct
     for i in range(len(left)):
-        wizard = ''
-        try:
-            if type(left[i]) == list and type(right[i]) == int:
-                return is_correct(left[i], [right[i]])
-            elif type(right[i]) == list and type(left[i]) == int:
-                return is_correct([left[i]], right[i])
-            elif type(right[i]) == list and type(left[i]) == list:
-                return is_correct(left[i], right[i])
-            else:
-                if left[i] < right[i]:
-                    return True
-                elif left[i] == right[i]:
-                    continue
-                else:
-                    return False
-        except IndexError:
-            # right side ran out of values
-            return False
-    return True  # left side ran out of values
+        if i == right_qty:
+            return -1
+        ans = compare(left[i], right[i])
+        if ans != 0:
+            return ans
 
+    # after compare, we still have items in right
+    if right_qty > left_qty:
+        return 1
+
+    # everything shows they're equal, so continue
+    return 0
+
+
+def to_list(item):
+    if type(item) == list:
+        return item
+    return [item]
+
+
+def compare(left, right):
+    if type(left) == type(right) == int:
+        return compare_ints(left, right)
+    else:
+        return compare_lists(to_list(left), to_list(right))
+
+
+def compare_runner(left, right):
+    correct_order = compare(left, right)
+    if correct_order == -1:  # wrong order
+        return -1
+    return 1  # correct order
+
+
+### Part 1 ###
 part_1 = 0
 for i in range(0, len(input), 2):
     left = input[i]
     right = input[i + 1]
-    correct_order = is_correct(left, right)
-    if correct_order:
+    correct_order = compare_runner(left, right)
+    if correct_order == 1:
         part_1 += i // 2 + 1
 
 print("Part 1:", part_1)
+
+
+### Part 2 ###
+part_2 = 0
+input = list(filter(lambda x: x != '', input))
+
+ADDITIONAL = [[[2]], [[6]]]
+for to_add in ADDITIONAL:
+    input.append(to_add)
+
+input.sort(key=cmp_to_key(compare_runner), reverse=True)
+
+part_2 = 1
+for added in ADDITIONAL:
+    part_2 *= (input.index(added) + 1)
+
+print("Part 2:", part_2)
