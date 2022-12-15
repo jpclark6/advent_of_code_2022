@@ -3,8 +3,8 @@ import json
 from functools import cmp_to_key
 
 
-filename = "example.txt"
 filename = "input.txt"
+filename = "example.txt"
 directory, _ = os.path.split(__file__)
 filepath = directory + "/" + filename
 
