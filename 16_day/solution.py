@@ -1,3 +1,6 @@
+from collections import defaultdict
+from itertools import product
+from functools import cache
 import os
 import re
 
@@ -43,40 +46,48 @@ class Node:
         return f'< {self.id} - {self.flow_rate} - {",".join([x.id for x in self.connections])}'
 
 
-nodes = Nodes()
+non_zero_flows = dict()
+nodes = set()
+distances = defaultdict(lambda: 99999)
 
 p = re.compile('Valve (.*) has flow rate=(.*); tunnel(?:s?) lead(?:s?) to valve(?:s?) (.*)')
 for line in input:
     id, flow_rate, connections = p.findall(line)[0]
-    node = Node(id, flow_rate, connections)
-    nodes.add_node(node)
-nodes.update_node_connections()
+    if flow_rate != '0':
+        non_zero_flows[id] = int(flow_rate)
+    nodes.add(id)
+    for conn in connections.split(', '):
+        distances[id, conn] = 1
 
+for k, i, j in product(nodes, repeat=3):  # floyd-warshall
+    distances[i,j] = min(distances[i,j], distances[i,k] + distances[k,j])
 
-class Path:
-    def __init__(self, path=None, minutes=30):
-        self.path = path or [] # {'node': node, 'action': action}
-        self.minutes = minutes
+@cache
+def search(time, non_zero_flows_set=frozenset(non_zero_flows), current_node='AA'):
+    answers = []
+    for id in non_zero_flows_set:
+        if distances[current_node, id] > time:
+            continue
+        ans = (
+            non_zero_flows[id] * (time - distances[current_node, id] - 1)
+            + search(time-distances[current_node, id] - 1, non_zero_flows_set - {id}, id))
+        answers.append(ans)
+    return max(answers, default=0)
 
-    @property
-    def total(self):
-        total = 0
-        minutes = self.minutes
-        for node in self.path:
-            if node['action'] == 'open':
-                total += minutes * node['node'].flow_rate
-                minutes -= 2
-            else:
-                minutes -= 1
-        return total
+print(search(30))
 
+@cache
+def search_p2(time, non_zero_flows_set=frozenset(non_zero_flows), current_node='AA', top_level=False):
+    answers = []
+    for id in non_zero_flows_set:
+        if distances[current_node, id] > time:
+            continue
+        ans = (
+            non_zero_flows[id] * (time - distances[current_node, id] - 1)
+            + search_p2(time-distances[current_node, id] - 1, non_zero_flows_set - {id}, id, top_level=True))
+        answers.append(ans)
+    if top_level:
+        answers.append(search(26, non_zero_flows_set=non_zero_flows_set))
+    return max(answers, default=0)
 
-## Part 1
-START = 'AA'
-node = nodes.get(START)
-final_path = Path()
-
-while True:
-    for conn1 in node.connections:
-        for conn2 in conn1.connections:
-            
+print(search_p2(26, top_level=True))
