@@ -1,11 +1,12 @@
 import os
 import re
-from collections import defaultdict
-from copy import deepcopy
+from itertools import combinations, chain
+from copy import copy
+from pprint import pprint as pp
 
 
-filename = "input.txt"
 filename = "example.txt"
+filename = "input.txt"  # 1480 3168
 directory, _ = os.path.split(__file__)
 filepath = directory + "/" + filename
 
@@ -16,12 +17,12 @@ with open(filepath, "r") as f:
 class Recipe:
     def __init__(self, **kwargs):
         self.blueprint = kwargs['blueprint']
-        self.ore_robot_ore = kwargs['ore_robot_ore']
-        self.clay_robot_ore = kwargs['clay_robot_ore']
-        self.obsidian_robot_ore = kwargs['obsidian_robot_ore']
-        self.obsidian_robot_clay = kwargs['obsidian_robot_clay']
-        self.geode_robot_ore = kwargs['geode_robot_ore']
-        self.geode_robot_obsidian = kwargs['geode_robot_obsidian']
+        self.ore_r_ore = kwargs['ore_r_ore']
+        self.clay_r_ore = kwargs['clay_r_ore']
+        self.obsidian_r_ore = kwargs['obsidian_r_ore']
+        self.obsidian_r_clay = kwargs['obsidian_r_clay']
+        self.geode_r_ore = kwargs['geode_r_ore']
+        self.geode_r_obsidian = kwargs['geode_r_obsidian']
 
 
 p = re.compile('\d+')
@@ -31,125 +32,130 @@ for line in input:
     recipes.append(Recipe(
         **dict(
             blueprint = int(numbers[0]),
-            ore_robot_ore = int(numbers[1]),
-            clay_robot_ore = int(numbers[2]),
-            obsidian_robot_ore = int(numbers[3]),
-            obsidian_robot_clay = int(numbers[4]),
-            geode_robot_ore = int(numbers[5]),
-            geode_robot_obsidian = int(numbers[6]),
+            ore_r_ore = int(numbers[1]),
+            clay_r_ore = int(numbers[2]),
+            obsidian_r_ore = int(numbers[3]),
+            obsidian_r_clay = int(numbers[4]),
+            geode_r_ore = int(numbers[5]),
+            geode_r_obsidian = int(numbers[6]),
         )
     ))
 
 
+def hash_state(state):
+    return (
+        f'{state["r_ore"]},{state["ore"]}'
+        f'{state["r_clay"]},{state["clay"]}'
+        f'{state["r_obsidian"]},{state["obsidian"]}'
+        f'{state["r_geode"]},{state["geode"]}'
+    )
 
-def find_max_geodes(robots, inventory, minutes, new_robots, recipe):
+
+def has_supplies(rs, state, recipe):
+    required = {'ore': 0, 'clay': 0, 'obsidian': 0, 'geode': 0}
+    for r in rs:
+        if r == 'r_ore':
+            required['ore'] += recipe.ore_r_ore
+        elif r == 'r_clay':
+            required['ore'] += recipe.clay_r_ore
+        elif r == 'r_obsidian':
+            required['ore'] += recipe.obsidian_r_ore
+            required['clay'] += recipe.obsidian_r_clay
+        elif r == 'r_geode':
+            required['ore'] += recipe.geode_r_ore
+            required['obsidian'] += recipe.geode_r_obsidian
+    if (
+        required['ore'] <= state['ore']
+        and required['clay'] <= state['clay']
+        and required['obsidian'] <= state['obsidian']
+    ):
+        return True
+    return False
+
+
+def prune_states(states):
+    ORE = 1
+    CLAY = 10
+    OBSIDIAN = 150
+    GEODE = 10000
+    ORE_R = 1
+    CLAY_R = 10
+    OBSIDIAN_R = 250
+    GEODE_R = 10000
+
+    new_states = sorted(
+        states,
+        key= lambda x: (
+            x['ore'] * ORE
+            + x['clay'] * CLAY
+            + x['obsidian'] * OBSIDIAN
+            + x['geode'] * GEODE
+            + x['r_ore'] * ORE_R
+            + x['r_clay'] * CLAY_R
+            + x['r_obsidian'] * OBSIDIAN_R
+            + x['r_geode'] * GEODE_R
+        ),
+        reverse=True)
+    states = new_states[:1000]
+    return states
+
+
+def find_max_geodes(recipe, minutes):
+    visited = set()
     states = [{
-        'robots': robots,
-        'inventory': inventory,
-        'minutes': minutes,
-        'new_robots': new_robots,
+        'r_ore': 1, 'ore': 0,
+        'r_clay': 0, 'clay': 0,
+        'r_obsidian': 0, 'obsidian': 0,
+        'r_geode': 0, 'geode': 0,
     }]
-    totals = []
-    seenbefore = set()
-    while states:
-        state = states.pop()
-        if str(state) in seenbefore:
-            continue
-        else:
-            seenbefore.add(str(state))
+    while minutes > 0:
+        next_states = []
+        while states:
+            state = states.pop()
+            visited.add(hash_state(state))
+            for rs in [(), ('r_ore',), ('r_clay',), ('r_obsidian',), ('r_geode',)]:
+                if has_supplies(rs, state, recipe):
+                    to_build = rs
+                else:
+                    continue
+                _state = copy(state)
+                _state['ore'] += _state['r_ore']
+                _state['clay'] += _state['r_clay']
+                _state['obsidian'] += _state['r_obsidian']
+                _state['geode'] += _state['r_geode']
+                for r in to_build:
+                    _state[r] += 1
+                    if r == 'r_ore':
+                        _state['ore'] -= recipe.ore_r_ore
+                    elif r == 'r_clay':
+                        _state['ore'] -= recipe.clay_r_ore
+                    elif r == 'r_obsidian':
+                        _state['ore'] -= recipe.obsidian_r_ore
+                        _state['clay'] -= recipe.obsidian_r_clay
+                    elif r == 'r_geode':
+                        _state['ore'] -= recipe.geode_r_ore
+                        _state['obsidian'] -= recipe.geode_r_obsidian
+                if hash_state(_state) not in visited:
+                    next_states.append(_state)
+        minutes -= 1
+        states = next_states
+        states = prune_states(states)
 
-
-        # Add new robots and subtract inventory
-        while state['new_robots']:
-            robot = state['new_robots'].pop()
-            state['robots'][robot] += qty
-            if robot == 'ore':
-                state['inventory']['ore'] -= recipe.ore_robot_ore
-                state['robots']['ore'] += 1
-            elif robot == 'clay':
-                state['inventory']['ore'] -= recipe.clay_robot_ore
-                state['robots']['clay'] += 1
-            elif robot == 'obsidian':
-                state['inventory']['ore'] -= recipe.obsidian_robot_ore
-                state['inventory']['clay'] -= recipe.obsidian_robot_clay
-                state['robots']['obsidian'] += 1
-            elif robot == 'geode':
-                state['inventory']['ore'] -= recipe.geode_robot_ore
-                state['inventory']['obsidian'] -= recipe.geode_robot_obsidian
-                state['robots']['geode'] += 1
-
-
-        if state['inventory']['ore'] >= recipe.ore_robot_ore:
-            new_state = deepcopy(state)
-            new_state['new_robots'].append('ore')
-            new_state['inventory']['ore'] -= recipe.ore_robot_ore
-            states.append(new_state)
-        if state['inventory']['ore'] >= recipe.clay_robot_ore:
-            new_state = deepcopy(state)
-            new_state['new_robots'].append('clay')
-            new_state['inventory']['ore'] -= recipe.clay_robot_ore
-            states.append(new_state)
-        if state['inventory']['ore'] >= recipe.ore_robot_ore + recipe.clay_robot_ore:
-            new_state = deepcopy(state)
-            new_state['new_robots'].append('ore')
-            new_state['new_robots'].append('clay')
-            new_state['inventory']['ore'] -= recipe.ore_robot_ore + recipe.clay_robot_ore
-            states.append(new_state)
-        if state['inventory']['ore'] >= recipe.obsidian_robot_ore and state['inventory']['clay'] >= recipe.obsidian_robot_clay:
-            new_state = deepcopy(state)
-            new_state['new_robots'].append('obsidian')
-            new_state['inventory']['ore'] -= recipe.obsidian_robot_ore
-            new_state['inventory']['clay'] -= recipe.obsidian_robot_clay
-            states.append(new_state)
-        if state['inventory']['ore'] >= recipe.geode_robot_ore and state['inventory']['obsidian'] >= recipe.geode_robot_obsidian:
-            new_state = deepcopy(state)
-            new_state['new_robots'].append('geode')
-            new_state['inventory']['ore'] -= recipe.geode_robot_ore
-            new_state['inventory']['obsidian'] -= recipe.geode_robot_obsidian
-            states.append(new_state)
-
-#   Each ore robot costs 4 ore.
-#   Each clay robot costs 2 ore.
-#   Each obsidian robot costs 3 ore and 14 clay.
-#   Each geode robot costs 2 ore and 7 obsidian.
-
-        # Add new inventory for things mined during minute
-        for robot, qty in state['robots'].items():
-            state['inventory'][robot] += qty
-
-        # Subtract time
-        state['minutes'] -= 1
-
-        # Don't add new state if time is 0
-        if state['minutes'] == 0:
-            totals.append(state['inventory']['geode'])
-        else:
-            states.append(state)
-
-        print(len(states), len(totals), state['inventory'])
-    return max(totals)
-
-
-def setup_and_run_max_geodes(recipe, minutes):
-    robots = {
-        'ore': 1,
-        'clay': 0,
-        'obsidian': 0,
-        'geode': 0,
-    }
-    inventory = {
-        'ore': 0,
-        'clay': 0,
-        'obsidian': 0,
-        'geode': 0,
-    }
-    new_robots = []
-    return find_max_geodes(robots, inventory, minutes, new_robots, recipe)
+    max_geode = max(states, key=lambda x: x['geode'])['geode']
+    return max_geode
 
 
 MINUTES = 24
 values = 0
 for recipe in recipes:
-    max_geodes = setup_and_run_max_geodes(recipe, MINUTES)
+    max_geodes = find_max_geodes(recipe, MINUTES)
     values += max_geodes * recipe.blueprint
 print("Part 1:", values)
+
+
+MINUTES = 32
+values = 1
+for recipe in recipes[:3]:
+    max_geodes = find_max_geodes(recipe, MINUTES)
+    values *= max_geodes
+print("Part 2:", values)  # 1465 too low

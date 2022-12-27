@@ -45,7 +45,7 @@ def printer(state):
         print(row)
     print()
 
-STATES = 2000
+STATES = 1000
 puzzle = []
 puzzle.append(state)
 
@@ -95,8 +95,8 @@ part_1 = True
 part_2 = False
 part_3 = False
 for round in range(STATES):
-    if round % 100 == 0:
-        print(round, '/', STATES, len(locations), max(locations), max(locations, key=lambda x: x[1]))
+    # if round % 100 == 0:
+    #     print(round, '/', STATES, len(locations), max(locations), max(locations, key=lambda x: x[1]))
     next_locations = set()
     while locations:
         location = locations.pop()
